@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toledo Outdoor Sports Weather</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f4f4f4; color:#333; }
+  header { background:#2c3e50; color:white; padding:20px; text-align:center; }
+  h1 { margin:0; font-size:1.8em; }
+  .container { padding:20px; }
+  .weather-status { font-size:1.2em; margin:10px 0; font-weight:bold; }
+  .forecast, .hourly { margin:20px 0; }
+  .day { background:white; padding:10px; margin-bottom:10px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); display:flex; align-items:center; }
+  .time { width:80px; font-weight:bold; }
+  .condition { margin-left:10px; display:flex; align-items:center; }
+  .icon { width:24px; height:24px; margin-right:8px; }
+  .best-time { font-weight:bold; color:green; background:#d4f4dd; padding:5px 8px; border-radius:5px; }
+  .good { color:green; }
+  .moderate { color:orange; }
+  .bad { color:red; }
+  .sports { margin-top:20px; font-style:italic; }
+  @media (max-width:600px) { .day { flex-direction: column; align-items: flex-start; } .time, .condition { width:100%; margin:0; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Toledo Outdoor Sports Courts</h1>
+  <p>Check the best time to play today!</p>
+</header>
+<div class="container">
+  <div class="weather-status" id="currentStatus">Loading current weather...</div>
+  <div class="hourly">
+    <h2>Hourly Forecast</h2>
+    <div id="hourlyForecast">Loading hourly forecast...</div>
+  </div>
+  <div class="forecast">
+    <h2>7-Day Forecast</h2>
+    <div id="dailyForecast">Loading daily forecast...</div>
+  </div>
+  <div class="sports">
+    Available Sports: Pickleball | Tennis | Volleyball | Multi-purpose courts
+  </div>
+</div>
+<script>
+const latitude = 10.4025; // Toledo City, Cebu
+const longitude = 123.6819;
+const weekdays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+function getWeatherIcon(cond){
+  if(cond==='Sunny') return '☀️';
+  if(cond==='Rain') return '🌧️';
+  if(cond==='Windy') return '💨';
+  return '';
+}
+
+function getPlayabilityClass(cond){
+  if(cond==='Sunny') return 'good';
+  if(cond==='Windy') return 'moderate';
+  if(cond==='Rain') return 'bad';
+  return '';
+}
+
+async function getWeather() {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,windspeed_10m,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    // Current Weather (first hourly data)
+    const currentTemp = data.hourly.temperature_2m[0];
+    const currentWind = data.hourly.windspeed_10m[0];
+    const currentPrecip = data.hourly.precipitation[0];
+    let status = 'Good to play';
+    let playClass = 'good';
+    let icon='☀️';
+
+    if(currentPrecip>0){ status='Rain Expected'; playClass='bad'; icon='🌧️';}
+    else if(currentWind>20){ status='Windy'; playClass='moderate'; icon='💨';}
+
+    document.getElementById('currentStatus').innerHTML = `<span class='${playClass}'>${icon} Current: ${currentTemp}°C, Wind: ${currentWind} km/h, ${status}</span>`;
+
+    // Hourly Forecast (next 12 hours)
+    let hourlyHTML='';
+    for(let i=0;i<12;i++){
+      const hour = new Date(data.hourly.time[i]).getHours() + ':00';
+      let cond='Sunny';
+      if(data.hourly.precipitation[i]>0) cond='Rain';
+      else if(data.hourly.windspeed_10m[i]>20) cond='Windy';
+      let playClassHour=getPlayabilityClass(cond);
+      let iconHour=getWeatherIcon(cond);
+      let bestTimeClass='';
+      if(cond==='Sunny' && data.hourly.temperature_2m[i]<35 && data.hourly.windspeed_10m[i]<20) bestTimeClass='best-time';
+      hourlyHTML += `<div class="day"><span class="time">${hour}</span><span class="condition ${playClassHour} ${bestTimeClass}">${iconHour} ${cond}, ${data.hourly.temperature_2m[i]}°C</span></div>`;
+    }
+    document.getElementById('hourlyForecast').innerHTML = hourlyHTML;
+
+    // 7-Day Forecast with weekdays
+    let dailyHTML='';
+    for(let i=0;i<7;i++){
+      let cond='Sunny';
+      if(data.daily.weathercode[i]>60) cond='Rain';
+      let playClassDay=getPlayabilityClass(cond);
+      let iconDay=getWeatherIcon(cond);
+      dailyHTML += `<div class="day"><span class='condition ${playClassDay}'>${iconDay} ${weekdays[i]}: ${cond}, Max ${data.daily.temperature_2m_max[i]}°C, Min ${data.daily.temperature_2m_min[i]}°C</span></div>`;
+    }
+    document.getElementById('dailyForecast').innerHTML = dailyHTML;
+
+  } catch(e){
+    document.getElementById('currentStatus').innerHTML = 'Unable to load weather.';
+    document.getElementById('hourlyForecast').innerHTML='';
+    document.getElementById('dailyForecast').innerHTML='';
+    console.error(e);
+  }
+}
+
+getWeather();
+</script>
+</body>
+</html>
